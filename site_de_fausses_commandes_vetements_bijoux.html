@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Fake Shop Avancé</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: Arial, sans-serif; margin:0; background:#f6f6f6; }
+  header { background:#111; color:#fff; padding:20px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { margin:0; font-size:1.5em; }
+  .container { display:flex; }
+  .sidebar { width:200px; background:#222; color:#fff; min-height:100vh; padding:20px; }
+  .sidebar button { width:100%; margin:5px 0; padding:10px; border:none; border-radius:5px; cursor:pointer; background:#333; color:#fff; }
+  .sidebar button:hover { background:#444; }
+  .main { flex:1; padding:20px; }
+  .collection, .orders { background:#fff; padding:20px; border-radius:10px; margin-bottom:20px; }
+  .products { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .product { border:1px solid #ddd; padding:10px; border-radius:5px; text-align:center; }
+  .product img { width:100%; border-radius:5px; }
+  .order-item { border-bottom:1px solid #ddd; padding:10px; }
+  .badge { background:red; color:#fff; padding:2px 6px; border-radius:50%; margin-left:5px; font-size:0.9em; }
+  .step { margin:10px 0; }
+  .hidden { display:none; }
+  .article-list { margin:10px 0; border:1px solid #ccc; padding:10px; border-radius:5px; }
+  .button-step { margin:5px 0; padding:5px 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fake Shop Avancé</h1>
+  <div id="orderBadge">Commandes en attente <span class="badge" id="badgeCount">0</span></div>
+</header>
+<div class="container">
+  <div class="sidebar">
+    <button onclick="showCollections()">Collections</button>
+    <button onclick="showOrders()">Commandes</button>
+  </div>
+  <div class="main" id="mainContent">
+    <!-- Contenu dynamique -->
+  </div>
+</div>
+<script>
+let collections = [];
+let orders = [];
+let selectedCollection = null;
+let selectedOrder = null;
+let orderIdCounter = 1;
+let firstCollectionPublished = false;
+
+function showCollections() {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = '<h2>Collections</h2>';
+  main.innerHTML += '<button onclick="createCollection()">Créer une nouvelle collection</button>';
+  collections.forEach((c,i)=>{
+    let articleList = c.articles.map(a=>`${a.name} (${a.price}€ ${a.size||''})`).join(', ');
+    main.innerHTML += `<div class=\"collection\"><strong>${c.name}</strong> - ${c.status} - ${c.date || 'Pas de date'}<br>Articles: ${articleList}<br><button onclick=\"editCollection(${i})\">Éditer</button> <button onclick=\"publishCollection(${i})\">Publier</button></div>`;
+  });
+}
+
+function createCollection(){
+  const name = prompt('Nom de la collection:');
+  if(!name) return;
+  const date = prompt('Date et heure de publication (YYYY-MM-DD HH:MM) ou laisser vide pour publication immédiate:');
+  collections.push({name:name, articles:[], status:'Brouillon', date: date, published:false});
+  showCollections();
+}
+
+function editCollection(index){
+  const c = collections[index];
+  let adding = true;
+  while(adding){
+    const name = prompt('Nom de l\'article à ajouter à '+c.name+' (laisser vide pour finir):');
+    if(!name){ adding=false; break; }
+    const price = parseFloat(prompt('Prix de l\'article:'));
+    const size = prompt('Tailles/variantes (optionnel, séparées par /)');
+    c.articles.push({name:name, price:price, size:size});
+  }
+  showCollections();
+}
+
+function publishCollection(index){
+  const c = collections[index];
+  c.status = 'En ligne';
+  c.published = true;
+  if(!firstCollectionPublished){ firstCollectionPublished = true; startOrderGenerator(); }
+  showCollections();
+}
+
+function showOrders(){
+  const main = document.getElementById('mainContent');
+  main.innerHTML = '<h2>Commandes</h2>';
+  orders.forEach((o,i)=>{
+    main.innerHTML += `<div class=\"order-item\"><strong>${o.id}</strong> - ${o.collection} - ${o.status} - ${o.client || 'Fictif'} <button onclick=\"prepareOrder(${i})\">Ouvrir</button></div>`;
+  });
+  updateBadge();
+}
+
+function prepareOrder(index){
+  selectedOrder = orders[index];
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<h2>Préparation commande ${selectedOrder.id}</h2>`;
+  main.innerHTML += '<div class=\"step\"><input type=checkbox id=checkProduct> Vérifier le(s) article(s)</div>';
+  main.innerHTML += '<div class=\"step\"><input type=checkbox id=checkSize> Vérifier taille/variante</div>';
+  main.innerHTML += '<div class=\"step\"><input type=checkbox id=checkAddress> Vérifier adresse</div>';
+  main.innerHTML += '<button class=\"button-step\" onclick=\"nextStep()\">Valider vérification</button>';
+  main.innerHTML += '<button class=\"button-step hidden\" id=btnPackage onclick=\"packageOrder()\">Emballer la commande</button>';
+  main.innerHTML += '<button class=\"button-step hidden\" id=btnLabel onclick=\"generateLabel()\">Générer l\'étiquette</button>';
+  main.innerHTML += '<button class=\"button-step hidden\" id=btnSend onclick=\"sendOrder()\">Envoyer la commande</button>';
+}
+
+function nextStep(){
+  const p = document.getElementById('checkProduct').checked;
+  const s = document.getElementById('checkSize').checked;
+  const a = document.getElementById('checkAddress').checked;
+  if(!p||!s||!a){ alert('Tu dois cocher toutes les étapes pour continuer'); return; }
+  selectedOrder.status='En préparation';
+  document.getElementById('btnPackage').classList.remove('hidden');
+  showOrders();
+}
+
+function packageOrder(){
+  selectedOrder.status='Emballée';
+  document.getElementById('btnPackage').classList.add('hidden');
+  document.getElementById('btnLabel').classList.remove('hidden');
+  showOrders();
+}
+
+function generateLabel(){
+  selectedOrder.tracking = 'TRK'+Math.floor(Math.random()*1000000);
+  selectedOrder.status='Étiquette générée';
+  document.getElementById('btnLabel').classList.add('hidden');
+  document.getElementById('btnSend').classList.remove('hidden');
+  showOrders();
+}
+
+function sendOrder(){
+  selectedOrder.status='Expédiée';
+  document.getElementById('btnSend').classList.add('hidden');
+  showOrders();
+  simulateTracking(selectedOrder);
+}
+
+function simulateTracking(order){
+  const stages = ['Pris en charge','En transit','Arrivé au centre de tri','En cours de livraison','Livré'];
+  let i=0;
+  const interval = setInterval(()=>{
+    if(i>=stages.length){ clearInterval(interval); return; }
+    order.status = stages[i];
+    showOrders();
+    i++;
+  }, 15000); // 15 secondes par étape pour simulation rapide
+}
+
+function updateBadge(){
+  const count = orders.filter(o=>o.status==='Nouvelle' || o.status==='En préparation').length;
+  document.getElementById('badgeCount').innerText = count;
+}
+
+function startOrderGenerator(){
+  function generateOrder(){
+    if(!firstCollectionPublished) return;
+    if(collections.filter(c=>c.published).length===0) return;
+    const c = collections[Math.floor(Math.random()*collections.length)];
+    if(c.articles.length===0) return;
+    const numOrders = Math.floor(Math.random()*5)+1;
+    for(let i=0;i<numOrders;i++){
+      const art = c.articles[Math.floor(Math.random()*c.articles.length)];
+      orders.push({id:'CMD'+orderIdCounter++, collection:c.name, article:art.name, status:'Nouvelle', client:'Client fictif', size:art.size});
+    }
+    updateBadge();
+    showOrders();
+    const nextTime = Math.random()*210000+30000;
+    setTimeout(generateOrder,nextTime);
+  }
+  generateOrder();
+}
+
+showCollections();
+</script>
+</body>
+</html>
